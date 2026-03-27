@@ -16,7 +16,7 @@ export default function TopNav({ search, onSearchChange, onLogout, logo }: TopNa
         {logo ? <Image src={logo} alt="The Great Callina Logo" width={54} height={54} className="logo-img" priority /> : null}
         <div className="brand-text">
           <p className="brand-kicker">Admin CRM</p>
-          <h1>The Great Callina Banquet Hall</h1>
+          <h1>The Great Callina </h1>
         </div>
       </div>
       <div className="nav-actions">
