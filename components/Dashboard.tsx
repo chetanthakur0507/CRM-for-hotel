@@ -8,7 +8,8 @@ interface MetricsData {
 }
 
 interface ChartData {
-  monthlyRevenue: Array<{ month: string; value: number }>;
+  monthlyRevenue: Array<{ month: string; value: number; amount: number }>;
+  isDemoRevenue: boolean;
   eventTypeLegend: string[];
 }
 
@@ -46,12 +47,17 @@ export default function Dashboard({ metrics, chartData }: DashboardProps) {
       <section className="panel chart-panel" id="reports">
         <div>
           <h2>Monthly Revenue</h2>
-          <p>Live bar chart using payment entries</p>
+          <p>
+            {chartData.isDemoRevenue
+              ? "Showing demo raw data for now (live entries will replace this automatically)."
+              : "Live bar chart using payment entries"}
+          </p>
           <div className="bar-chart" role="img" aria-label="Monthly revenue bar chart">
             {chartData.monthlyRevenue.map((item) => (
               <div key={item.month} className="bar-col">
+                <span className="bar-amount">{formatMoney(item.amount)}</span>
                 <div className="bar-fill" style={{ height: `${Math.max(item.value, 6)}%` }} />
-                <span>{item.month}</span>
+                <span className="bar-month">{item.month}</span>
               </div>
             ))}
           </div>

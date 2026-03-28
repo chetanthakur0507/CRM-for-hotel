@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent } from "react";
+import Link from "next/link";
 import { Booking, Customer } from "@/lib/types";
 
 const halls = ["Emerald Hall", "Royal Ballroom", "Garden Pavilion"];
@@ -20,8 +21,11 @@ interface BookingManagementProps {
   customers: Customer[];
   bookings: Booking[];
   bookingForm: BookingFormData;
+  bookingEditId: string | null;
   onFormChange: (form: BookingFormData) => void;
   onSave: (event: FormEvent<HTMLFormElement>) => void;
+  onEdit: (booking: Booking) => void;
+  onCancelEdit: () => void;
   onDelete: (id: string) => void;
 }
 
@@ -29,8 +33,11 @@ export default function BookingManagement({
   customers,
   bookings,
   bookingForm,
+  bookingEditId,
   onFormChange,
   onSave,
+  onEdit,
+  onCancelEdit,
   onDelete,
 }: BookingManagementProps) {
   return (
@@ -136,8 +143,13 @@ export default function BookingManagement({
           </select>
         </label>
         <button type="submit" className="action-btn">
-          Save Booking
+          {bookingEditId ? "Update Booking" : "Save Booking"}
         </button>
+        {bookingEditId ? (
+          <button type="button" className="table-btn" onClick={onCancelEdit}>
+            Cancel Edit
+          </button>
+        ) : null}
       </form>
 
       <div className="table-wrap">
@@ -169,9 +181,16 @@ export default function BookingManagement({
                   </span>
                 </td>
                 <td>
+                  <button type="button" className="table-btn" onClick={() => onEdit(row)}>
+                    Edit
+                  </button>
+                  <Link href={`/bookings/${row._id}`} className="table-btn" style={{ marginLeft: 8 }}>
+                    View
+                  </Link>
                   <button
                     type="button"
                     className="table-btn danger-btn"
+                    style={{ marginLeft: 8 }}
                     onClick={() => onDelete(row._id)}
                   >
                     Delete

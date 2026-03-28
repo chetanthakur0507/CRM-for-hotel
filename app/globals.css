@@ -461,18 +461,30 @@ body {
   display: grid;
   gap: 6px;
   justify-items: center;
+  height: 100%;
+  align-content: end;
 }
 
 .bar-fill {
   width: 100%;
   max-width: 36px;
+  min-width: 18px;
+  min-height: 8px;
   border-radius: 8px 8px 3px 3px;
   background: linear-gradient(180deg, #f6de9c 0%, #d9b15b 46%, #9a7427 100%);
 }
 
-.bar-col span {
+.bar-month {
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+.bar-amount {
+  font-size: 0.72rem;
+  color: var(--brand-soft);
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .pie-chart {

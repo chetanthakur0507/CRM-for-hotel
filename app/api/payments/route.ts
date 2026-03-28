@@ -11,6 +11,8 @@ function serialize(item: {
   remainingAmount: number;
   status: "Paid" | "Pending";
   dueDate?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }) {
   return {
     _id: item._id.toString(),
@@ -21,6 +23,8 @@ function serialize(item: {
     remainingAmount: item.remainingAmount,
     status: item.status,
     dueDate: item.dueDate,
+    createdAt: item.createdAt?.toISOString(),
+    updatedAt: item.updatedAt?.toISOString(),
   };
 }
 

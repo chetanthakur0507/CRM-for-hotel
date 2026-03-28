@@ -25,6 +25,8 @@ export type Payment = {
   remainingAmount: number;
   status: "Paid" | "Pending";
   dueDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Reminder = {

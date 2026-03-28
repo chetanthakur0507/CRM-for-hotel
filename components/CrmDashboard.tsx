@@ -30,6 +30,18 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function parsePaymentDate(row: Payment) {
+  const candidates = [row.dueDate, row.createdAt];
+  for (const value of candidates) {
+    if (!value) continue;
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  return new Date();
+}
+
 export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("Loading real-time data from database...");
@@ -55,6 +67,7 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
     hall: halls[0],
     status: "Pending" as "Confirmed" | "Pending",
   });
+  const [bookingEditId, setBookingEditId] = useState<string | null>(null);
 
   const [paymentForm, setPaymentForm] = useState({
     customerId: "",
@@ -109,25 +122,34 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
 
   const chartData = useMemo(() => {
     const revenueByMonth = new Map<string, number>();
+    const paymentDates: Date[] = [];
 
     for (const row of payments) {
-      const date = row.dueDate ? new Date(row.dueDate) : new Date();
-      const month = date.toLocaleString("en-US", { month: "short" });
-      revenueByMonth.set(month, (revenueByMonth.get(month) ?? 0) + row.paidAmount);
+      const date = parsePaymentDate(row);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + row.paidAmount);
+      paymentDates.push(date);
     }
 
-    const monthOrder = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const now = new Date().getMonth();
-    const start = now - 5 >= 0 ? now - 5 : 0;
-    const last6 = monthOrder.slice(start, now + 1);
-    const normalizedMonths = last6.length > 0 ? last6 : monthOrder.slice(0, 6);
+    const latestPaymentTime = paymentDates.reduce((max, date) => Math.max(max, date.getTime()), 0);
+    const anchorDate = new Date(Math.max(Date.now(), latestPaymentTime));
+    const monthsToShow = Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(anchorDate.getFullYear(), anchorDate.getMonth() - (5 - index), 1);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const label = date.toLocaleString("en-US", { month: "short" });
+      return { key, label };
+    });
 
-    const values = normalizedMonths.map((month) => revenueByMonth.get(month) ?? 0);
-    const maxValue = Math.max(...values, 1);
+    const liveAmounts = monthsToShow.map((item) => revenueByMonth.get(item.key) ?? 0);
+    const demoAmounts = [45000, 52000, 61000, 48000, 70000, 66000];
+    const isDemoRevenue = payments.length === 0 || liveAmounts.every((amount) => amount === 0);
+    const activeAmounts = isDemoRevenue ? demoAmounts : liveAmounts;
+    const maxValue = Math.max(...activeAmounts, 1);
 
-    const monthlyRevenue = normalizedMonths.map((month) => ({
-      month,
-      value: Math.round(((revenueByMonth.get(month) ?? 0) / maxValue) * 100),
+    const monthlyRevenue = monthsToShow.map((item, index) => ({
+      month: item.label,
+      value: Math.round((activeAmounts[index] / maxValue) * 100),
+      amount: activeAmounts[index],
     }));
 
     const eventTypeCounts = eventTypes.reduce<Record<string, number>>((acc, type) => {
@@ -145,7 +167,7 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
       })
       .filter(Boolean);
 
-    return { monthlyRevenue, eventTypeLegend };
+    return { monthlyRevenue, isDemoRevenue, eventTypeLegend };
   }, [payments, bookings]);
 
   const foodQuantity = useMemo(() => {
@@ -305,13 +327,66 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
     }
 
     try {
-      const created = await createRecord<Booking>("/api/bookings", payload);
-      setBookings((prev) => [...prev, created]);
-      setNotice("Booking saved in database.");
-      setBookingForm((prev) => ({ ...prev, customerName: "", eventDate: "", guests: "150" }));
+      if (bookingEditId) {
+        const response = await fetch(`/api/bookings/${bookingEditId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error ?? "Unable to update booking");
+        }
+
+        const updated = (await response.json()) as Booking;
+        setBookings((prev) => prev.map((row) => (row._id === bookingEditId ? updated : row)));
+        setNotice("Booking updated in database.");
+      } else {
+        const created = await createRecord<Booking>("/api/bookings", payload);
+        setBookings((prev) => [...prev, created]);
+        setNotice("Booking saved in database.");
+      }
+
+      setBookingEditId(null);
+      setBookingForm({
+        customerId: "",
+        customerName: "",
+        eventDate: "",
+        eventType: "Wedding",
+        guests: "150",
+        hall: halls[0],
+        status: "Pending",
+      });
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Unable to save booking");
     }
+  }
+
+  function handleEditBooking(row: Booking) {
+    setBookingEditId(row._id);
+    setBookingForm({
+      customerId: row.customerId ?? "",
+      customerName: row.customerName,
+      eventDate: row.eventDate,
+      eventType: row.eventType,
+      guests: String(row.guests),
+      hall: row.hall,
+      status: row.status,
+    });
+  }
+
+  function handleCancelEditBooking() {
+    setBookingEditId(null);
+    setBookingForm({
+      customerId: "",
+      customerName: "",
+      eventDate: "",
+      eventType: "Wedding",
+      guests: "150",
+      hall: halls[0],
+      status: "Pending",
+    });
   }
 
   async function handleDeleteBooking(id: string) {
@@ -521,8 +596,11 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
             customers={customers}
             bookings={bookings}
             bookingForm={bookingForm}
+            bookingEditId={bookingEditId}
             onFormChange={setBookingForm}
             onSave={(event) => void handleSaveBooking(event)}
+            onEdit={handleEditBooking}
+            onCancelEdit={handleCancelEditBooking}
             onDelete={(id) => void handleDeleteBooking(id)}
           />
 
