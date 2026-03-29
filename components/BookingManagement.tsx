@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, useRef } from "react";
 import Link from "next/link";
 import { Booking, Customer } from "@/lib/types";
 
@@ -12,6 +12,7 @@ interface BookingFormData {
   customerName: string;
   eventDate: string;
   eventType: string;
+  eventTypeOther: string;
   guests: string;
   hall: string;
   status: "Confirmed" | "Pending";
@@ -22,6 +23,7 @@ interface BookingManagementProps {
   bookings: Booking[];
   bookingForm: BookingFormData;
   bookingEditId: string | null;
+  minDate: string;
   onFormChange: (form: BookingFormData) => void;
   onSave: (event: FormEvent<HTMLFormElement>) => void;
   onEdit: (booking: Booking) => void;
@@ -34,12 +36,28 @@ export default function BookingManagement({
   bookings,
   bookingForm,
   bookingEditId,
+  minDate,
   onFormChange,
   onSave,
   onEdit,
   onCancelEdit,
   onDelete,
 }: BookingManagementProps) {
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  function openDatePicker() {
+    const input = dateInputRef.current;
+    if (!input) return;
+
+    if (typeof input.showPicker === "function") {
+      try {
+        input.showPicker();
+      } catch {
+        // Ignore browsers that block programmatic picker opening.
+      }
+    }
+  }
+
   return (
     <section id="bookings" className="panel">
       <h2>Booking Management</h2>
@@ -76,8 +94,11 @@ export default function BookingManagement({
           Date picker 📅
           <input
             id="b-date"
+            ref={dateInputRef}
             type="date"
+            min={minDate}
             value={bookingForm.eventDate}
+            onClick={openDatePicker}
             onChange={(event) =>
               onFormChange({ ...bookingForm, eventDate: event.target.value })
             }
@@ -99,6 +120,20 @@ export default function BookingManagement({
             ))}
           </select>
         </label>
+        {bookingForm.eventType === "Other" ? (
+          <label htmlFor="b-type-other">
+            Custom Event Type
+            <input
+              id="b-type-other"
+              type="text"
+              placeholder="Enter event type"
+              value={bookingForm.eventTypeOther}
+              onChange={(event) =>
+                onFormChange({ ...bookingForm, eventTypeOther: event.target.value })
+              }
+            />
+          </label>
+        ) : null}
         <label htmlFor="b-guests">
           Guest Count
           <input

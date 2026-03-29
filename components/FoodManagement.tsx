@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent } from "react";
+import Link from "next/link";
 import { FoodPlan } from "@/lib/types";
 
 interface FoodFormData {
@@ -13,18 +14,24 @@ interface FoodFormData {
 interface FoodManagementProps {
   foodPlans: FoodPlan[];
   foodForm: FoodFormData;
+  foodEditId: string | null;
   foodQuantity: string;
   onFormChange: (form: FoodFormData) => void;
   onSave: (event: FormEvent<HTMLFormElement>) => void;
+  onEdit: (foodPlan: FoodPlan) => void;
+  onCancelEdit: () => void;
   onDelete: (id: string) => void;
 }
 
 export default function FoodManagement({
   foodPlans,
   foodForm,
+  foodEditId,
   foodQuantity,
   onFormChange,
   onSave,
+  onEdit,
+  onCancelEdit,
   onDelete,
 }: FoodManagementProps) {
   return (
@@ -85,8 +92,13 @@ export default function FoodManagement({
           <input id="food-qty" type="text" value={foodQuantity} readOnly />
         </label>
         <button type="submit" className="action-btn">
-          Save Food Plan
+          {foodEditId ? "Update Food Plan" : "Save Food Plan"}
         </button>
+        {foodEditId ? (
+          <button type="button" className="table-btn" onClick={onCancelEdit}>
+            Cancel Edit
+          </button>
+        ) : null}
       </form>
 
       <div className="table-wrap">
@@ -110,9 +122,16 @@ export default function FoodManagement({
                 <td>{row.foodQuantity}</td>
                 <td>{row.eventDate || "-"}</td>
                 <td>
+                  <button type="button" className="table-btn" onClick={() => onEdit(row)}>
+                    Edit
+                  </button>
+                  <Link href={`/food/${row._id}`} className="table-btn" style={{ marginLeft: 8 }}>
+                    View
+                  </Link>
                   <button
                     type="button"
                     className="table-btn danger-btn"
+                    style={{ marginLeft: 8 }}
                     onClick={() => onDelete(row._id)}
                   >
                     Delete

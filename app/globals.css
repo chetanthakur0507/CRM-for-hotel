@@ -504,6 +504,11 @@ body {
   font-size: 0.9rem;
 }
 
+.empty-note {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .section-title-row {
   display: flex;
   justify-content: space-between;
@@ -667,6 +672,81 @@ textarea {
   font-size: 0.92rem;
 }
 
+.admin-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.admin-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.admin-calendar-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: separate;
+  border-spacing: 6px;
+}
+
+.admin-calendar-table th,
+.admin-calendar-table td {
+  border: 0;
+  padding: 0;
+  text-align: center;
+}
+
+.admin-calendar-table th {
+  background: transparent;
+  color: var(--brand-soft);
+  box-shadow: none;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+}
+
+.admin-calendar-head {
+  margin-bottom: 6px;
+}
+
+.admin-calendar-cell {
+  min-height: 78px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface), #000 8%);
+  display: grid;
+  align-content: space-between;
+  text-align: left;
+}
+
+.admin-calendar-cell.head {
+  min-height: auto;
+  text-align: center;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--surface-strong), var(--brand) 8%);
+}
+
+.admin-calendar-cell.has-event {
+  border-color: color-mix(in srgb, var(--brand), #fff 10%);
+  background: color-mix(in srgb, var(--surface-strong), var(--brand) 16%);
+  color: var(--foreground);
+}
+
+.admin-calendar-cell small {
+  font-size: 0.68rem;
+  color: var(--brand-soft);
+}
+
 .invoice-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -771,6 +851,14 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .admin-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-two-col {
+    grid-template-columns: 1fr;
+  }
+
   .chart-panel,
   .invoice-grid,
   .form-grid,
@@ -813,6 +901,8 @@ textarea {
 @media (max-width: 600px) {
   .dashboard-grid,
   .split-cards,
+  .admin-kpi-grid,
+  .admin-two-col,
   .chart-panel,
   .invoice-grid,
   .form-grid,

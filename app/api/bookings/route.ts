@@ -40,12 +40,22 @@ export async function POST(request: Request) {
   const guests = Number(body?.guests ?? 0);
   const hall = String(body?.hall ?? "").trim();
   const status = body?.status === "Confirmed" ? "Confirmed" : "Pending";
+  const today = new Date().toISOString().slice(0, 10);
 
   if (!customerName || !eventDate || !eventType || guests <= 0 || !hall) {
     return NextResponse.json({ error: "All booking fields are required" }, { status: 400 });
   }
 
+  if (eventDate < today) {
+    return NextResponse.json({ error: "Past date cannot be selected for booking" }, { status: 400 });
+  }
+
   await connectToDatabase();
+  const conflict = await Booking.findOne({ eventDate, hall }).lean();
+  if (conflict) {
+    return NextResponse.json({ error: "Selected hall is already booked on this date" }, { status: 409 });
+  }
+
   const created = await Booking.create({ customerId, customerName, eventDate, eventType, guests, hall, status });
 
   return NextResponse.json(serialize(created), { status: 201 });

@@ -42,7 +42,7 @@ export async function PUT(request: Request, context: RouteContext) {
   const updated = await Customer.findByIdAndUpdate(
     id,
     { name, phone, email },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   );
 
   if (!updated) {

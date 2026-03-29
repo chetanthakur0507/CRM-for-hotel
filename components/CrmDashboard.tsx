@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
+import Swal from "sweetalert2";
 import TopNav from "@/components/TopNav";
 import LeftSidebar from "@/components/LeftSidebar";
 import StatusNotice from "@/components/StatusNotice";
@@ -63,6 +64,7 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
     customerName: "",
     eventDate: "",
     eventType: "Wedding",
+    eventTypeOther: "",
     guests: "150",
     hall: halls[0],
     status: "Pending" as "Confirmed" | "Pending",
@@ -76,6 +78,7 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
     paidAmount: "",
     dueDate: "",
   });
+  const [paymentEditId, setPaymentEditId] = useState<string | null>(null);
 
   const [reminderForm, setReminderForm] = useState({
     type: "Event tomorrow" as "Event tomorrow" | "Payment due",
@@ -89,6 +92,7 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
     guests: "150",
     eventDate: "",
   });
+  const [foodEditId, setFoodEditId] = useState<string | null>(null);
 
   const [invoiceForm, setInvoiceForm] = useState({
     customerId: "",
@@ -97,6 +101,50 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
     amountBreakdown: "",
     totalAmount: "",
   });
+
+  const showSuccessAlert = useCallback((title: string, text: string) => {
+    void Swal.fire({
+      icon: "success",
+      title,
+      text,
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false,
+      timer: 1900,
+      timerProgressBar: true,
+    });
+  }, []);
+
+  const showErrorAlert = useCallback((text: string) => {
+    void Swal.fire({
+      icon: "error",
+      title: "Action failed",
+      text,
+      confirmButtonText: "OK",
+    });
+  }, []);
+
+  const showWarningAlert = useCallback((text: string) => {
+    void Swal.fire({
+      icon: "warning",
+      title: "Booking Conflict",
+      text,
+      confirmButtonText: "OK",
+    });
+  }, []);
+
+  const showWarningConfirm = useCallback(async (title: string, text: string) => {
+    const result = await Swal.fire({
+      icon: "warning",
+      title,
+      text,
+      showCancelButton: true,
+      confirmButtonText: "Continue",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+    });
+    return result.isConfirmed;
+  }, []);
 
   const filteredCustomers = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -277,16 +325,20 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
         const updated = (await response.json()) as Customer;
         setCustomers((prev) => prev.map((row) => (row._id === customerEditId ? updated : row)));
         setNotice("Customer updated in database.");
+        showSuccessAlert("Customer Updated", "Customer details updated successfully.");
       } else {
         const created = await createRecord<Customer>("/api/customers", payload);
         setCustomers((prev) => [created, ...prev]);
         setNotice("Customer saved in database.");
+        showSuccessAlert("Customer Saved", "Customer details saved successfully.");
       }
 
       setCustomerEditId(null);
       setCustomerForm({ name: "", phone: "", email: "" });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to save customer");
+      const message = error instanceof Error ? error.message : "Unable to save customer";
+      setNotice(message);
+      showErrorAlert(message);
     }
   }
 
@@ -310,19 +362,56 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
 
     const selectedCustomer = customers.find((row) => row._id === bookingForm.customerId);
     const customerName = selectedCustomer?.name || bookingForm.customerName.trim();
+    const today = todayISO();
+    const normalizedEventType =
+      bookingForm.eventType === "Other" ? bookingForm.eventTypeOther.trim() : bookingForm.eventType;
 
     const payload = {
       customerId: bookingForm.customerId,
       customerName,
       eventDate: bookingForm.eventDate,
-      eventType: bookingForm.eventType,
+      eventType: normalizedEventType,
       guests: Number(bookingForm.guests || 0),
       hall: bookingForm.hall,
       status: bookingForm.status,
     };
 
-    if (!payload.customerName || !payload.eventDate || payload.guests <= 0) {
+    if (!payload.customerName || !payload.eventDate || !payload.eventType || payload.guests <= 0) {
       setNotice("Booking form is incomplete.");
+      return;
+    }
+
+    if (payload.eventDate < today) {
+      const message = "Past date cannot be selected for booking.";
+      setNotice(message);
+      showWarningAlert(message);
+      return;
+    }
+
+    const hasHallConflict = bookings.some(
+      (row) => row.eventDate === payload.eventDate && row.hall === payload.hall && row._id !== bookingEditId
+    );
+
+    const hasSameDateEvent = bookings.some(
+      (row) => row.eventDate === payload.eventDate && row._id !== bookingEditId
+    );
+
+    if (hasSameDateEvent && !hasHallConflict) {
+      const shouldContinue = await showWarningConfirm(
+        "Same Date Already Has Event",
+        `Another event is already scheduled on ${payload.eventDate}. Do you want to continue with this booking?`
+      );
+
+      if (!shouldContinue) {
+        setNotice("Booking save cancelled by user.");
+        return;
+      }
+    }
+
+    if (hasHallConflict) {
+      const message = `Selected hall is already booked on ${payload.eventDate}. Please choose another date or hall.`;
+      setNotice(message);
+      showWarningAlert(message);
       return;
     }
 
@@ -342,10 +431,12 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
         const updated = (await response.json()) as Booking;
         setBookings((prev) => prev.map((row) => (row._id === bookingEditId ? updated : row)));
         setNotice("Booking updated in database.");
+        showSuccessAlert("Booking Updated", "Booking details updated successfully.");
       } else {
         const created = await createRecord<Booking>("/api/bookings", payload);
         setBookings((prev) => [...prev, created]);
         setNotice("Booking saved in database.");
+        showSuccessAlert("Booking Saved", "Booking details saved successfully.");
       }
 
       setBookingEditId(null);
@@ -354,22 +445,27 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
         customerName: "",
         eventDate: "",
         eventType: "Wedding",
+        eventTypeOther: "",
         guests: "150",
         hall: halls[0],
         status: "Pending",
       });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to save booking");
+      const message = error instanceof Error ? error.message : "Unable to save booking";
+      setNotice(message);
+      showErrorAlert(message);
     }
   }
 
   function handleEditBooking(row: Booking) {
+    const isKnownType = eventTypes.includes(row.eventType);
     setBookingEditId(row._id);
     setBookingForm({
       customerId: row.customerId ?? "",
       customerName: row.customerName,
       eventDate: row.eventDate,
-      eventType: row.eventType,
+      eventType: isKnownType ? row.eventType : "Other",
+      eventTypeOther: isKnownType ? "" : row.eventType,
       guests: String(row.guests),
       hall: row.hall,
       status: row.status,
@@ -383,6 +479,7 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
       customerName: "",
       eventDate: "",
       eventType: "Wedding",
+      eventTypeOther: "",
       guests: "150",
       hall: halls[0],
       status: "Pending",
@@ -419,13 +516,52 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
     }
 
     try {
-      const created = await createRecord<Payment>("/api/payments", payload);
-      setPayments((prev) => [created, ...prev]);
-      setNotice("Payment saved in database.");
+      if (paymentEditId) {
+        const response = await fetch(`/api/payments/${paymentEditId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error ?? "Unable to update payment");
+        }
+
+        const updated = (await response.json()) as Payment;
+        setPayments((prev) => prev.map((row) => (row._id === paymentEditId ? updated : row)));
+        setNotice("Payment updated in database.");
+        showSuccessAlert("Payment Updated", "Payment details updated successfully.");
+      } else {
+        const created = await createRecord<Payment>("/api/payments", payload);
+        setPayments((prev) => [created, ...prev]);
+        setNotice("Payment saved in database.");
+        showSuccessAlert("Payment Saved", "Payment details saved successfully.");
+      }
+
+      setPaymentEditId(null);
       setPaymentForm({ customerId: "", customerName: "", totalAmount: "", paidAmount: "", dueDate: "" });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to save payment");
+      const message = error instanceof Error ? error.message : "Unable to save payment";
+      setNotice(message);
+      showErrorAlert(message);
     }
+  }
+
+  function handleEditPayment(row: Payment) {
+    setPaymentEditId(row._id);
+    setPaymentForm({
+      customerId: row.customerId ?? "",
+      customerName: row.customerName,
+      totalAmount: String(row.totalAmount),
+      paidAmount: String(row.paidAmount),
+      dueDate: row.dueDate ?? "",
+    });
+  }
+
+  function handleCancelEditPayment() {
+    setPaymentEditId(null);
+    setPaymentForm({ customerId: "", customerName: "", totalAmount: "", paidAmount: "", dueDate: "" });
   }
 
   async function handleDeletePayment(id: string) {
@@ -455,8 +591,11 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
       setReminders((prev) => [created, ...prev]);
       setReminderForm((prev) => ({ ...prev, message: "", dueDate: "" }));
       setNotice("Reminder saved in database.");
+      showSuccessAlert("Reminder Saved", "Reminder details saved successfully.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to save reminder");
+      const message = error instanceof Error ? error.message : "Unable to save reminder";
+      setNotice(message);
+      showErrorAlert(message);
     }
   }
 
@@ -480,18 +619,59 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
     }
 
     try {
-      const created = await createRecord<FoodPlan>("/api/food-plans", {
+      const payload = {
         customerName: foodForm.customerName,
         menuType: foodForm.menuType,
         guests,
         foodQuantity,
         eventDate: foodForm.eventDate,
-      });
-      setFoodPlans((prev) => [created, ...prev]);
-      setNotice("Food plan saved in database.");
+      };
+
+      if (foodEditId) {
+        const response = await fetch(`/api/food-plans/${foodEditId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error ?? "Unable to update food plan");
+        }
+
+        const updated = (await response.json()) as FoodPlan;
+        setFoodPlans((prev) => prev.map((row) => (row._id === foodEditId ? updated : row)));
+        setNotice("Food plan updated in database.");
+        showSuccessAlert("Food Plan Updated", "Food plan details updated successfully.");
+      } else {
+        const created = await createRecord<FoodPlan>("/api/food-plans", payload);
+        setFoodPlans((prev) => [created, ...prev]);
+        setNotice("Food plan saved in database.");
+        showSuccessAlert("Food Plan Saved", "Food plan details saved successfully.");
+      }
+
+      setFoodEditId(null);
+      setFoodForm({ customerName: "", menuType: "Veg", guests: "150", eventDate: "" });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to save food plan");
+      const message = error instanceof Error ? error.message : "Unable to save food plan";
+      setNotice(message);
+      showErrorAlert(message);
     }
+  }
+
+  function handleEditFoodPlan(row: FoodPlan) {
+    setFoodEditId(row._id);
+    setFoodForm({
+      customerName: row.customerName ?? "",
+      menuType: row.menuType,
+      guests: String(row.guests),
+      eventDate: row.eventDate ?? "",
+    });
+  }
+
+  function handleCancelEditFoodPlan() {
+    setFoodEditId(null);
+    setFoodForm({ customerName: "", menuType: "Veg", guests: "150", eventDate: "" });
   }
 
   async function handleDeleteFoodPlan(id: string) {
@@ -555,8 +735,11 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
       pdf.save(filename);
 
       setNotice("Invoice saved to database and PDF downloaded.");
+      showSuccessAlert("Invoice Saved", "Invoice saved and PDF downloaded successfully.");
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Unable to generate invoice");
+      const message = error instanceof Error ? error.message : "Unable to generate invoice";
+      setNotice(message);
+      showErrorAlert(message);
     }
   }
 
@@ -597,6 +780,7 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
             bookings={bookings}
             bookingForm={bookingForm}
             bookingEditId={bookingEditId}
+            minDate={todayISO()}
             onFormChange={setBookingForm}
             onSave={(event) => void handleSaveBooking(event)}
             onEdit={handleEditBooking}
@@ -608,8 +792,11 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
             customers={customers}
             payments={payments}
             paymentForm={paymentForm}
+            paymentEditId={paymentEditId}
             onFormChange={setPaymentForm}
             onSave={(event) => void handleSavePayment(event)}
+            onEdit={handleEditPayment}
+            onCancelEdit={handleCancelEditPayment}
             onDelete={(id) => void handleDeletePayment(id)}
           />
 
@@ -624,15 +811,23 @@ export default function CrmDashboard({ initialSection }: CrmDashboardProps) {
           </section>
 
           <section id="admin-panel">
-            <AdminPanel />
+            <AdminPanel
+              bookings={bookings}
+              payments={payments}
+              foodPlans={foodPlans}
+              invoices={invoices}
+            />
           </section>
 
           <FoodManagement
             foodPlans={foodPlans}
             foodForm={foodForm}
+            foodEditId={foodEditId}
             foodQuantity={foodQuantity}
             onFormChange={setFoodForm}
             onSave={(event) => void handleSaveFoodPlan(event)}
+            onEdit={handleEditFoodPlan}
+            onCancelEdit={handleCancelEditFoodPlan}
             onDelete={(id) => void handleDeleteFoodPlan(id)}
           />
 

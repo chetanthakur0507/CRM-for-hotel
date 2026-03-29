@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent } from "react";
+import Link from "next/link";
 import { Payment, Customer } from "@/lib/types";
 
 interface PaymentFormData {
@@ -15,8 +16,11 @@ interface PaymentTrackingProps {
   customers: Customer[];
   payments: Payment[];
   paymentForm: PaymentFormData;
+  paymentEditId: string | null;
   onFormChange: (form: PaymentFormData) => void;
   onSave: (event: FormEvent<HTMLFormElement>) => void;
+  onEdit: (payment: Payment) => void;
+  onCancelEdit: () => void;
   onDelete: (id: string) => void;
 }
 
@@ -28,8 +32,11 @@ export default function PaymentTracking({
   customers,
   payments,
   paymentForm,
+  paymentEditId,
   onFormChange,
   onSave,
+  onEdit,
+  onCancelEdit,
   onDelete,
 }: PaymentTrackingProps) {
   const totalPaid = payments.reduce((sum, row) => sum + row.paidAmount, 0);
@@ -112,8 +119,13 @@ export default function PaymentTracking({
           />
         </label>
         <button type="submit" className="action-btn">
-          Save Payment
+          {paymentEditId ? "Update Payment" : "Save Payment"}
         </button>
+        {paymentEditId ? (
+          <button type="button" className="table-btn" onClick={onCancelEdit}>
+            Cancel Edit
+          </button>
+        ) : null}
       </form>
 
       <div className="table-wrap">
@@ -141,9 +153,16 @@ export default function PaymentTracking({
                   </span>
                 </td>
                 <td>
+                  <button type="button" className="table-btn" onClick={() => onEdit(row)}>
+                    Edit
+                  </button>
+                  <Link href={`/payments/${row._id}`} className="table-btn" style={{ marginLeft: 8 }}>
+                    View
+                  </Link>
                   <button
                     type="button"
                     className="table-btn danger-btn"
+                    style={{ marginLeft: 8 }}
                     onClick={() => onDelete(row._id)}
                   >
                     Delete
