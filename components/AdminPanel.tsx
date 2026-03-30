@@ -368,7 +368,7 @@ export default function AdminPanel({ bookings, payments, foodPlans, invoices }: 
             }
           >
             <option value="All">All</option>
-            <option value="Confirmed">Confirmed</option>
+            <option value="Confirmed">Confirme</option>
             <option value="Pending">Pending</option>
           </select>
         </label>
